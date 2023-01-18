@@ -46,7 +46,7 @@ function loadPlist() {
 			val=$(defaults read "${configFile}" "${key}" 2>/dev/null)
 			if [[ $? -eq 0 ]]; then
 				echo "UPDATE: Setting ${key} to ${val}"
-				eval "${hashName}[$key]=$val"
+				eval "${hashName}[$key]='$val'"
 			fi
 		done
 	fi
@@ -61,8 +61,8 @@ function loadArgs() {
 		eval "${hashName}[currentuser]=$3"
 		shift 3
 	fi
-	while [[ $1 ]] ; do
-		case $1 in
+	while [[ "$1" ]] ; do
+		case "$1" in
 			--*=* ) # Key/Value pairs
 				key=$(echo "$1" | sed -re 's|^\-\-([^=]+)\=.*$|\1|g')
 				val=$(echo "$1" | sed -re 's|^\-\-[^=]+\=(.*)$|\1|g')
@@ -76,7 +76,7 @@ function loadArgs() {
 		keys=${(Pk)hashName}
 		if (($keys[(Ie)$key])); then
 			echo "${key} is valid. Setting to ${val}"
-			eval "${hashName}[${key}]=${val}"
+			eval "${hashName}[${key}]='${val}'"
 		else
 			echo "Ignoring unknown key: ${key}"
 		fi
@@ -189,40 +189,39 @@ if [[ ${ACTION} == "promote" ]]; then
 			STATUS=1
 		fi
 		
-		## Remove from scoped static group if requested
-		if [[ ${REMOVEGROUP} ]]; then
-			if [[ ${BASICAUTH} ]]; then
-				## Get the Jamf Pro URL
-				jamfURL=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
-				
-				## Token time
-				authToken=$(getAPIToken "${jamfURL}" "${BASICAUTH}")
-				
-				## Let's remove the computer from the requested group
-				serialNumber=$(system_profiler SPHardwareDataType | awk '/Serial Number/ {print $NF}')
-
-				## We need to url encode the group name for the XML
-				sanitiezedGroup=$(curl -s -o /dev/null -w %{url_effective} --get --data-urlencode "${REMOVEGROUP}" "" | cut -c3-) ## URL Encoded
-				dataXML="<?xml version=\"1.0\" encoding=\"UTF-8\" ?><computer_group><computer_deletions><computer><serial_number>${serialNumber}</serial_number></computer></computer_deletions></computer_group>"
-				## Send the API command
-				curl -s -X PUT \
-					-H "Content-type: text/xml" \
-					-H "Authorization: Bearer ${authToken}" \
-					"${jamfURL}/JSSResource/computergroups/name/${sanitiezedGroup}" \
-					-d "${dataXML}"
-
-				
-			else
-				echo "ERROR: API access requested but no auth provided"
-			fi
-		fi
 
 	else ## Nothing to do here
-		osascript -e 'display dialog "You are already an admin."'
-		echo "${CURRENTUSER} is already an admin. Exiting."
-		exit 0
+		osascript -e 'display dialog "You are already an admin."' &
+		echo "${CURRENTUSER} is already an admin."
 	fi
-	
+
+	## Remove from scoped static group if requested
+	if [[ ${REMOVEGROUP} ]]; then
+		if [[ ${BASICAUTH} ]]; then
+			echo "Removing computer from ${REMOVEGROUP}"
+			## Get the Jamf Pro URL
+			jamfURL=$(defaults read /Library/Preferences/com.jamfsoftware.jamf.plist jss_url)
+			
+			## Token time
+			authToken=$(getAPIToken "${jamfURL}" "${BASICAUTH}")
+			
+			## Let's remove the computer from the requested group
+			serialNumber=$(system_profiler SPHardwareDataType | awk '/Serial Number/ {print $NF}')
+
+			## We need to url encode the group name for the XML
+			sanitiezedGroup=$(curl -s -o /dev/null -w %{url_effective} --get --data-urlencode "${REMOVEGROUP}" "" | cut -c3-) ## URL Encoded
+			dataXML="<?xml version=\"1.0\" encoding=\"UTF-8\" ?><computer_group><computer_deletions><computer><serial_number>${serialNumber}</serial_number></computer></computer_deletions></computer_group>"
+			## Send the API command
+			curl -s -X PUT \
+				-H "Content-type: text/xml" \
+				-H "Authorization: Bearer ${authToken}" \
+				"${jamfURL}/JSSResource/computergroups/name/${sanitiezedGroup}" \
+				-d "${dataXML}"
+		else
+			echo "ERROR: API access requested but no auth provided"
+		fi
+	fi
+
 else ## We are demoting the previously promoted user
 	
 	CURRENTUSER=$(defaults read "${LOCALPLIST}" userToRemove 2>/dev/null)
@@ -319,3 +318,7 @@ EOF
 	/bin/zsh ${cleanUpScript} &
 fi
 
+:<<CODE 
+Rocketman Version Tracking
+[b3734bf|2b71755]
+CODE

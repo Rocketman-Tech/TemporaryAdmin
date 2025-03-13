@@ -1,3 +1,6 @@
+# Migrated to Rocketman Command Center
+We have migrated this bash script to Rocketman Command Center - visit https://github.com/Rocketman-Tech/rcc/wiki/Temporary-Admin for more information.
+
 # Temporary Admin
 
 Provides temporary admin rights to standard users.
